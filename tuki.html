@@ -1,0 +1,80 @@
+<head>
+  <title>tuki</title>
+</head>
+
+<body>
+  <div id="fb-root"></div>
+  <script>
+    debugger;
+    window.fbAsyncInit = function() {
+    // init the FB JS SDK
+    FB.init({
+    appId      : '250248971771865',
+    status     : true, // check the login status upon init?
+    cookie     : true, // set sessions cookies to allow your server to access the session?
+    xfbml      : true,  // parse XFBML tags on this page?
+    frictionlessRequests : true
+    });
+    debugger;
+    // Additional initialization code such as adding Event Listeners goes here
+
+    };
+
+    // Load the SDK's source Asynchronously
+    // Note that the debug version is being actively developed and might 
+    // contain some type checks that are overly strict. 
+    // Please report such bugs using the bugs tool.
+    (function(d, debug){
+    debugger;
+    var js, id = 'facebook-jssdk', ref = d.getElementsByTagName('script')[0];
+    if (d.getElementById(id)) {return;}
+    js = d.createElement('script'); js.id = id; js.async = true;
+    js.src = "//connect.facebook.net/en_US/all" + (debug ? "/debug" : "") + ".js";
+    ref.parentNode.insertBefore(js, ref);
+    }(document, /*debug*/ false));
+  </script>
+  <h1>Welcome to Tuki</h1>
+  {{> login}}
+  {{> room}}
+  {{> myrooms}}
+</body>
+
+<template name="myrooms">
+  MY ROOMS:
+  <ul>
+  {{#each rooms}}
+  <li>
+    <a href="/{{room}}">{{room}}</a>
+    {{> peeps room}}
+  </li>
+  {{/each}}
+  </ul>
+</template>
+
+<template name="peeps">
+  {{#each rpeeps this}}
+  <span><img src="http://graph.facebook.com/{{this}}/picture"></span>
+  {{/each}}
+</template>
+
+<template name="login">
+  <div class="fb-modal modal hide" data-backdrop="static" data-keyboard="false">
+    <div class="modal-header">
+      Please login
+    </div>
+    <div class="modal-body">
+      {{loginButtons}}
+    </div>
+  </div>
+</template>
+
+<template name="room">
+  <h2>Room Name: {{rname}}</h2>
+  <ul>
+    {{#each messages}}
+    <li><span>{{name}}</span>:   <span>{{text}}</span>
+      {{/each}}
+  </ul>
+  <input class="message" value=""/>
+  <input type="button" value="send" class="send" />
+</template>
