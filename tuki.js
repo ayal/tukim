@@ -2,6 +2,16 @@ messages = new Meteor.Collection('messages');
 rooms = new Meteor.Collection('rooms');
 invites  = new Meteor.Collection('invites');
 
+
+myrooms = function(filter){
+  var nvts = invites.find(filter || {});
+  var roomz = {};
+  nvts.forEach(function(n){
+    !roomz[n.room] ? roomz[n.room] = {name: n.room, peeps: [n.uid]} : roomz[n.room].peeps.push(n.uid);
+  });
+  return roomz;
+};
+
 function GUID () {
   var S4 = function ()
   {
@@ -26,32 +36,27 @@ Meteor.methods({
       return;
     }
 
-    var metaroom = rooms.findOne({name: room});
-    if (!metaroom) {
-      rooms.insert({name: room, peeps: {}});
-    }
-    metaroom = rooms.findOne({name: room});
-
     if (req) {
-      var peeps = metaroom.peeps;
-
-      peeps[Meteor.user().services.facebook.id] = 'offline';
-
-      _.each(req.to, function(uid) {
-        invites.insert({uid: uid, room: room});
-        peeps[uid] = 'offline';
-      });
-
-      var toset = {
-        peeps: peeps
+      var sendInvite = function(id, room){
+        var data = {uid: id, room: room};
+        var theinvite = invites.findOne(data);
+        if (!theinvite) {
+          invites.insert(data);   
+        }
+        return theinvite;
       };
 
-      rooms.update({_id: metaroom._id}, {$set: toset});
+      sendInvite(Meteor.user().services.facebook.id, room);
+
+      _.each(req.to, function(uid) {
+        sendInvite(uid, room);
+      });
+     
     }
     
     var me = Meteor.user().profile.name;
-    messages.insert({name: me, text: '[[joined the room]]', room: room});
     if (!this.is_simulation) {
+      messages.insert({name: me, text: '[[joined the room]]', room: room});
       Meteor.publish(room + '_stream', function(){
         return messages.find({room: room});
       });
@@ -97,14 +102,8 @@ if (Meteor.isClient) {
   });
 
   Template.myrooms.rooms = function(){
-    return invites.find({});
-  };
-
-  Template.peeps.rpeeps = function(room) {
-    var theroom = rooms.findOne({name: room});
-    if (theroom) {
-      return _.keys(theroom.peeps);   
-    }
+    var roomz = myrooms();
+    return _.values(roomz);   
   };
 
   Template.room.rname = function(){
@@ -131,15 +130,14 @@ if (Meteor.isClient) {
       var room = Session.get('room');
       if (!room) {
         $(function(){
-          setTimeout(function(){
+          $('.roomodal').modal('show').find('#newroom').click(function(){
             FB.ui({method: 'apprequests',
                    message: 'wants to chat with you'
                   }, function(req){
                     Session.set('req', req);
                     window.app_router.navigate(prompt('room name?'), { trigger: true });
                   });
-
-          },1000);
+          });
         });
         return;
       }
@@ -153,7 +151,7 @@ if (Meteor.isClient) {
       
       h.stop();
       console.log(Meteor.user(), 'joining', room);
-      Meteor.call("joinroom", room, Session.get('req'), function(err, res){
+      Meteor.call("joinroom", room, Session.get('req'), function(err, res){        
         console.log('make room cb', room);
 
         if (err) {
@@ -181,15 +179,7 @@ if (Meteor.isClient) {
       ":room": "room"
     },
     reqtoroom: function(rids){
-      var rid = decodeURIComponent(rids.split('&')[0]).split(',').splice(-1)[0];
-      Meteor.subscribe('invitesData', function(e, data){
-        console.log('invites data', data);
-      });
-
-      Meteor.subscribe('roomsData', function(e, data){
-        console.log('rooms data', data);
-      });
-
+      handleroom();
     },
     gotoroom: function(){      
       handleroom();
@@ -198,16 +188,21 @@ if (Meteor.isClient) {
       Session.set('room', room);
       handleroom();
     } 
-  });
-
-  Meteor.subscribe('userData', function(){
-    console.log('userData',arguments);
-  });
-
+  });  
 
   window.app_router = new AppRouter();
 
-  Backbone.history.start({pushState: true});
+  Meteor.startup(function () {
+    Backbone.history.start({pushState: true});
+    Meteor.subscribe('userData', function(){
+      console.log('userData',arguments);
+    });
+
+    Meteor.subscribe('invitesData', function(e, data){
+      console.log('invites data', data);
+    });
+
+  });
 
 
 }
@@ -222,47 +217,28 @@ if (Meteor.isServer) {
   });
 
   Meteor.startup(function () {
+    [invites].map(function(x){
+      x.find({}).forEach(function(r){
+        console.log(r);
+      });
+      
+    });
+
     Meteor.publish("userData", function () {
       return Meteor.users.find({_id: this.userId}, {fields: {'rooms': 1, 'services.facebook': 1}});
     });
 
-
-
-    Meteor.publish('invitesData', function(){
+    Meteor.publish('invitesData', function() {
       var cuser = Meteor.users.findOne({_id: this.userId});
       var fbid = cuser && cuser.services && cuser.services.facebook ? cuser.services.facebook.id : '';
-      return invites.find({uid: fbid});
-    }); 
-
-    
-    Meteor.publish('roomsData', function(){
-      var cuser = Meteor.users.findOne({_id: this.userId});
-      var fbid = cuser && cuser.services && cuser.services.facebook ? cuser.services.facebook.id : '';
-      if (!fbid) {
-          return null;
-      }
-
-      var nvts = invites.find({uid: fbid});
-      
-      if (!nvts.count()) {
-        throw 'wtf';
-        return null;
-      }
-
-      var names = [];
-      var roomz = {
-          
-      };
-
-      nvts.forEach(function(nvt) {
-          names.push({"name": nvt.room});
+      var roomz = myrooms({uid: fbid});
+      var or = [{uid: fbid}];
+      _.each(_.keys(roomz), function(rname){
+        or.push({room: rname});
       });
- 
-      if (!names.length) {
-          return null;
-      }
-      return rooms.find({$or: names});
+      return invites.find({$or: or});
     }); 
 
+ 
   });
 }

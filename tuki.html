@@ -36,25 +36,24 @@
   <h1>Welcome to Tuki</h1>
   {{> login}}
   {{> room}}
+  <div class="modal hide roomodal" data-backdrop="static">
   {{> myrooms}}
+  </div>
 </body>
 
 <template name="myrooms">
-  MY ROOMS:
-  <ul>
-  {{#each rooms}}
-  <li>
-    <a href="/{{room}}">{{room}}</a>
-    {{> peeps room}}
-  </li>
-  {{/each}}
-  </ul>
-</template>
-
-<template name="peeps">
-  {{#each rpeeps this}}
-  <span><img src="http://graph.facebook.com/{{this}}/picture"></span>
-  {{/each}}
+    <div><a id="newroom" href="#">NEW ROOM</a></div>
+    MY ROOMS:
+    <ul>
+      {{#each rooms}}
+      <li>
+	<a href="/{{name}}">{{name}}</a>
+	{{#each peeps}}
+	<span><img src="http://graph.facebook.com/{{this}}/picture"></span>
+	{{/each}}    
+      </li>
+      {{/each}}
+    </ul>
 </template>
 
 <template name="login">
